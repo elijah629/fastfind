@@ -25,7 +25,7 @@ fn main() {
     }
 
     if args.contains(&"-V".to_string()) || args.contains(&"--version".to_string()) {
-        println!("fastfind v1.0.1");
+        println!("fastfind v0.1.1");
         return;
     }
     
