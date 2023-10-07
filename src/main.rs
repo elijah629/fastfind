@@ -1,10 +1,6 @@
-use std::path::Path;
-
-use walkdir::WalkDir;
-
 const USAGE: &str = r"Super fast file finder
 
-Usage: fastfind [SEARCH_DIRECTORY] [SEARCH_STRING]
+Usage: fastfind [GLOB_PATTERN]
 
 Options:
   -h, --help        Print help
@@ -19,13 +15,8 @@ fn usage() -> ! {
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
-    let dir = match args.get(1) {
+    let glob_pattern = match args.get(1) {
         Some(x) => x,
-        None => usage(),
-    };
-
-    let search = match args.get(2) {
-        Some(x) => x.as_str(),
         None => usage(),
     };
 
@@ -34,26 +25,17 @@ fn main() {
     }
 
     if args.contains(&"-V".to_string()) || args.contains(&"--version".to_string()) {
-        println!("fastfind v1.0.0");
+        println!("fastfind v1.0.1");
         return;
     }
     
-    let dir = Path::new(dir);
+    let current_dir = std::env::current_dir().unwrap();
 
-    if !dir.exists() {
-        eprintln!("Path {dir:?} does not exist"); 
-        return;
-    }
-
-    let mut x = 0;
-    for entry in WalkDir::new(dir).same_file_system(true) {
-        x += 1;
-        if let Ok(entry) = entry {
-            if entry.file_name().to_str().unwrap().contains(search) {
-                println!("{}", entry.path().display());
-            }
+    for entry in glob::glob_with(glob_pattern.as_str(), glob::MatchOptions { case_sensitive: false, require_literal_separator: false,
+    require_literal_leading_dot: false }).expect("Invalid glob pattern") {
+        match entry {
+            Ok(path) => println!("{}", current_dir.join(path).display()),
+            Err(e) => eprintln!("{:?}", e),
         }
     }
-
-    println!("{x} files scanned");
 }
