@@ -51,7 +51,6 @@ fn main() {
     }
 
     let mut output = BufWriter::new(File::create(output).unwrap());
-//    let cd = std::env::current_dir().unwrap();
 
     for entry in WalkDir::new(dir).same_file_system(true).min_depth(1).into_iter().filter_map(|x| x.ok()) {
             let data = format!("{}\n", entry.path().display());
