@@ -33,9 +33,8 @@ fn main() {
 
     for entry in glob::glob_with(glob_pattern.as_str(), glob::MatchOptions { case_sensitive: false, require_literal_separator: false,
     require_literal_leading_dot: false }).expect("Invalid glob pattern") {
-        match entry {
-            Ok(path) => println!("{}", current_dir.join(path).display()),
-            Err(e) => eprintln!("{:?}", e),
+        if let Ok(path) = entry {
+            println!("{}", current_dir.join(path).display());
         }
     }
 }
