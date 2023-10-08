@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use indicatif::{ProgressBar, ProgressStyle};
 use std::{
     fs::{self, File},
     io::{prelude::*, BufReader, BufWriter, Write},
@@ -24,8 +23,9 @@ enum Commands {
         /// Output for the index.
         output: PathBuf,
 
+        /// Seperates the filename from the directory in the index
         #[arg(short, long)]
-        no_progress: bool,
+        seperate_filename: bool,
     },
 
     /// Searches a sorted generated index.
@@ -35,6 +35,11 @@ enum Commands {
 
         // Search string
         search: String,
+
+        /// Does the index have the filename seperated? This will search the filename only if it is
+        /// activated
+        #[arg(short, long)]
+        seperated: bool,
     },
 }
 
@@ -49,7 +54,7 @@ fn main_r(args: Args) -> Result<(), String> {
         Commands::Index {
             directory,
             output,
-            no_progress,
+            seperate_filename,
         } => {
             if !directory.exists() {
                 return Err(format!("{directory:?} does not exist"));
@@ -63,49 +68,50 @@ fn main_r(args: Args) -> Result<(), String> {
             let mut output =
                 BufWriter::new(File::create(&output).map_err(|_| "failed to create index")?);
 
-            let walker = WalkDir::new(directory)
+            let mut completed = 0;
+
+            for entry in WalkDir::new(directory)
                 .same_file_system(true)
                 .min_depth(1)
                 .into_iter()
-                .filter_map(|x| x.ok());
-
-            if no_progress {
-                for entry in walker {
-                    let data = format!("{}\n", entry.path().display());
-
-                    output
-                        .write_all(data.as_bytes())
-                        .map_err(|_| "failed to write to index")?;
+                .filter_map(|x| x.ok())
+                .filter(|x| x.path().is_file())
+            {
+                let path = entry.path();
+                if seperate_filename {
+                    write!(
+                        output,
+                        "{}\t{}\n",
+                        path.parent().unwrap().display(),
+                        path.file_name().unwrap().to_str().unwrap()
+                    )
+                } else {
+                    write!(output, "{}\n", entry.path().display())
                 }
-            } else {
-                let bar = ProgressBar::new(0).with_style(
-                    ProgressStyle::default_bar()
-                        .template("{wide_bar} {pos}/{len} {eta}")
-                        .unwrap(),
-                );
+                .map_err(|_| "failed to write to index")
+                .unwrap();
 
-                for entry in walker {
-                    let data = format!("{}\n", entry.path().display());
-                    output
-                        .write_all(data.as_bytes())
-                        .map_err(|_| "failed to write to index")?;
-                    bar.inc(1);
-
-                    let position = bar.position();
-                    if bar.position() >= bar.length().unwrap() {
-                        bar.set_length((position * 2) + (position / 2))
-                    }
-                }
-
-                bar.finish();
+                completed += 1;
+                print!("\rcompleted {completed}");
             }
+            println!();
         }
 
-        Commands::Search { index, search } => {
+        Commands::Search {
+            index,
+            search,
+            seperated,
+        } => {
             let files = BufReader::new(File::open(index).map_err(|_| "failed to open index")?);
 
-            for file in files.lines() {
-                if let Ok(file) = file {
+            for file in files.lines().filter_map(|x| x.ok()) {
+                if seperated {
+                    let components = file.split_terminator('\t').collect::<Box<_>>();
+
+                    if components[1].contains(&search) {
+                        println!("{}/{}", components[0], components[1]);
+                    }
+                } else {
                     if file.contains(&search) {
                         println!("{}", file);
                     }
